@@ -1406,7 +1406,6 @@ void Camera::_pco_GetNumberOfImagesInSegment(WORD wSegment,
 
     err = camera->PCO_GetNumberOfImagesInSegment(wSegment, &dwValidImageCnt,
                                                  &dwMaxImageCnt);
-    std::cout << "\nmaxImage:" << dwMaxImageCnt << std::endl;
     PCO_CHECK_ERROR(err, "PCO_GetNumberOfImagesInSegment");
 
 #endif
