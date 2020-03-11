@@ -1406,6 +1406,7 @@ void Camera::_pco_GetNumberOfImagesInSegment(WORD wSegment,
 
     err = camera->PCO_GetNumberOfImagesInSegment(wSegment, &dwValidImageCnt,
                                                  &dwMaxImageCnt);
+    std::cout << "\nmaxImage:" << dwMaxImageCnt << std::endl;
     PCO_CHECK_ERROR(err, "PCO_GetNumberOfImagesInSegment");
 
 #endif
@@ -1463,6 +1464,10 @@ unsigned long Camera::_pco_GetNumberOfImagesInSegment_MaxCalc(int segmentPco)
     int segmentArr = segmentPco - 1;
     unsigned long xroisize, yroisize;
     unsigned long long pixPerFrame, pagesPerFrame;
+    WORD _pixPerPage;
+
+    WORD wDoubleImage;
+    WORD wCDIMode;
 
     Roi limaRoi;
     _pco_GetROI(limaRoi, error);
@@ -1473,7 +1478,18 @@ unsigned long Camera::_pco_GetNumberOfImagesInSegment_MaxCalc(int segmentPco)
     // xroisize = m_roi.x[1] - m_roi.x[0] + 1;
     // yroisize = m_roi.y[1] - m_roi.y[0] + 1;
 
-    pixPerFrame = (unsigned long long)xroisize * (unsigned long long)yroisize;
+    // Get CDIMode and DoubleImageMode values
+    _pco_GetDoubleImageMode(wDoubleImage, error);
+    _pco_GetCDIMode(wCDIMode, error);
+
+    if(wDoubleImage == 1 || wCDIMode == 1) // If CDIMode or DoubleImageMode are enabled, each image use twice as more pixels
+    {
+        pixPerFrame = (unsigned long long)xroisize * (unsigned long long)yroisize * 2;
+    }
+    else
+    {
+        pixPerFrame = (unsigned long long)xroisize * (unsigned long long)yroisize;
+    }
 
     if (pixPerFrame < 0)
     {
@@ -1487,8 +1503,18 @@ unsigned long Camera::_pco_GetNumberOfImagesInSegment_MaxCalc(int segmentPco)
                m_pcoData->wPixPerPage);
         return 0;
     }
-    pagesPerFrame = (pixPerFrame / m_pcoData->wPixPerPage) + 1;
-    if (pixPerFrame % m_pcoData->wPixPerPage)
+
+    if (_isCameraType(Dimax))
+    {
+        _pixPerPage = m_pcoData->wPixPerPage*1.9; // Taking into account compression (PCO use proprietary compression algorithm to store twice as much images)
+    }
+    else
+    {
+        _pixPerPage = m_pcoData->wPixPerPage;
+    }
+
+    pagesPerFrame = (pixPerFrame / _pixPerPage) + 1;
+    if (pixPerFrame % _pixPerPage)
         pagesPerFrame++;
 
     framesMax = m_pcoData->dwMaxFramesInSegment[segmentArr] =
