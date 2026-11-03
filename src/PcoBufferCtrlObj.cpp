@@ -2191,6 +2191,7 @@ void BufferCtrlObj::_pcoAllocBuffers(bool max)
         WORD _wMaxWidth, _wMaxHeight;
         m_cam->_pco_GetSizes(&_wArmWidth, &_wArmHeight, &_wMaxWidth,
                              &_wMaxHeight, error);
+        PCO_THROW_OR_TRACE(error, "PCO_GetSizes before buffer allocation");
 
         DWORD _dwAllocatedBufferSizeMax =
             (DWORD)_wMaxWidth * (DWORD)_wMaxHeight * (DWORD)_bytesPerPixel;
@@ -2243,6 +2244,14 @@ void BufferCtrlObj::_pcoAllocBuffers(bool max)
                 _dwAllocatedBufferSize, &m_allocBuff.pcoAllocBufferPtr[bufIdx],
                 &m_allocBuff.bufferAllocEvent[bufIdx]);
 
+            if (error)
+            {
+                const int allocationError = error;
+                m_allocBuff.pcoAllocBufferDone = true;
+                _pcoAllocBuffersFree();
+                PCO_THROW_OR_TRACE(allocationError, "PCO_AllocateBuffer");
+            }
+            m_allocBuff.dwPcoAllocBufferSize[bufIdx] = _dwAllocatedBufferSize;
             m_allocBuff.createEventsDone = true;
         }
 

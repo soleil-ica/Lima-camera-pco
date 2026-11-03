@@ -891,6 +891,10 @@ void Camera::prepareAcq()
 
     TrigMode trig_mode;
     m_sync->getTrigMode(trig_mode);
+    const bool ringBuffer = getRingBufferEnabled();
+    if (_isCameraType(Dimax) && trig_mode == ExtTrigSingle && !ringBuffer)
+        THROW_HW_ERROR(NotSupported)
+            << "EXTERNAL_SINGLE on Dimax requires ringBufferEnabled=true";
 
     //------------------------------------------------- check bin
     // info only, hw already set
@@ -952,7 +956,7 @@ void Camera::prepareAcq()
 
         getRecorderForcedFifo(forced);
 
-        if ((trig_mode == ExtTrigSingle) && (iRequestedFrames > 0))
+        if (ringBuffer)
         {
             mode = RecRing;
         }
@@ -1001,16 +1005,30 @@ void Camera::prepareAcq()
         WORD wRecordStopEventMode;
         DWORD dwRecordStopDelayImages;
 
-        if ((trig_mode == ExtTrigSingle) && (iRequestedFrames > 0))
+        if (ringBuffer)
         {
             wRecordStopEventMode =
                 0x0002; // record stop by edge at the <acq. enbl.>
-            dwRecordStopDelayImages = iRequestedFrames;
+            dwRecordStopDelayImages = 0;
             DEB_TRACE() << "..... PCO_SetRecordStopEvent";
             _pco_SetRecordStopEvent(wRecordStopEventMode,
                                     dwRecordStopDelayImages, error);
             PCO_THROW_OR_TRACE(error, "PCO_SetRecordStopEvent");
         }
+        else
+        {
+            _pco_SetRecordStopEvent(0, 0, error);
+            PCO_THROW_OR_TRACE(error, "PCO_SetRecordStopEvent (disabled)");
+        }
+#ifndef __linux__
+        if (ringBuffer)
+        {
+            error = PCO_CancelImages(m_handle);
+            PCO_THROW_OR_TRACE(error, "PCO_CancelImages");
+            error = PCO_ClearRamSegment(m_handle);
+            PCO_THROW_OR_TRACE(error, "PCO_ClearRamSegment");
+        }
+#endif
     }
 
     // Update the timeouts according the the exposure time

@@ -4,6 +4,14 @@
 
 find_package(yat CONFIG REQUIRED)
 
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(PCO_SDK_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/sdkPco/lib64")
+    set(PCO_SDK_BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/sdkPco/bin64")
+else()
+    set(PCO_SDK_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/sdkPco/lib")
+    set(PCO_SDK_BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/sdkPco/bin")
+endif()
+
 # --------------------------------------------------------------------------
 # Collect sources and includes
 # --------------------------------------------------------------------------
@@ -30,7 +38,7 @@ target_include_directories(limapco
 
 target_link_directories(limapco
     PRIVATE
-       sdkPco/lib64/
+    "${PCO_SDK_LIB_DIR}"
 )
 
 target_link_libraries(limapco 
@@ -78,7 +86,7 @@ install(
 )
 
 install(
-    DIRECTORY sdkPco/bin64/
+    DIRECTORY "${PCO_SDK_BIN_DIR}/"
     DESTINATION bin 
     FILES_MATCHING PATTERN "*.dll"
 )

@@ -74,6 +74,7 @@ namespace lima
     {
         class Camera;
         class SyncCtrlObj;
+        class RingBufferControl;
         class Interface;
 
         // int Camera::pcoGetError();
@@ -122,6 +123,8 @@ namespace lima
             int _xferImag_getImage();
             int _xferImag_getImage_edge();
             int _xferImagMult();
+            bool _ringBufferPreview();
+            bool _ringBufferExport(RingBufferControl& control, int history);
             void *_getLimaBuffer(int lima_buffer_nb, Sync::Status &status);
             void _pcoAllocBuffersFree();
             void _pcoAllocBuffersInfo(int &nr, DWORD &size);
