@@ -89,7 +89,9 @@ CXXFLAGS += $(INCLUDES) -fPIC -Wall -pthread -g -D WITH_GIT_VERSION
 pco-objs :=  \
             PcoBinCtrlObj.o  \
             PcoBufferCtrlObj.o  \
+            PcoBufferCtrlObjRingBuffer.o  \
             PcoCamera.o  \
+            PcoCameraRingBuffer.o  \
             PcoCameraSdk.o  \
             PcoCameraSdkLin.o  \
             PcoCameraSip.o  \
@@ -146,4 +148,3 @@ pco_%:		pco_%.cpp $(HEADERS)
 
 
 -include $(SRCS:.cpp=.P)
-

@@ -81,10 +81,12 @@ namespace lima
 
             void setAcqFrames(int nb_acq_frames)
             {
+                AutoMutex lock(m_cond.mutex());
                 m_nb_acq_frames = nb_acq_frames;
             }
             void getAcqFrames(int &nb_acq_frames)
             {
+                AutoMutex lock(m_cond.mutex());
                 nb_acq_frames = m_nb_acq_frames;
             }
 

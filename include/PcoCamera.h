@@ -29,6 +29,9 @@
 #include "lima/Constants.h"
 #include "lima/HwMaxImageSizeCallback.h"
 #include "lima/HwInterface.h"
+#include "PcoRingBuffer.h"
+
+#define LIMA_PCO_RING_BUFFER_API_VERSION 1
 
 //#include "PcoBufferCtrlObj.h"
 #include "PcoHwEventCtrlObj.h"
@@ -709,6 +712,18 @@ namespace lima
             void prepareAcq();
             void startAcq();
             void reset(int reset_level);
+            void setRingBufferEnabled(bool enabled);
+            bool getRingBufferEnabled();
+            bool isRingBufferBusy();
+            bool hasRingBufferFault();
+            std::string getRingBufferStatus();
+            void setRingBufferControl(RingBufferControl* control);
+            void releaseRingBufferControl(RingBufferControl* control);
+            void prepareRingBuffer();
+            void cancelRingBufferPreparation();
+            bool isRingBufferCompletionThread();
+            void runRingBuffer();
+            void setRingBufferStatus(const std::string& status);
 
 #ifdef __linux__
             CPco_com *camera;
@@ -811,6 +826,7 @@ namespace lima
             void _setActionTimestamp(int action);
 
           private:
+            RingBufferState m_ringBuffer;
             PcoHwEventCtrlObj *m_HwEventCtrlObj;
             SyncCtrlObj *m_sync;
             BufferCtrlObj *m_buffer;

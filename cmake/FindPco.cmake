@@ -34,7 +34,12 @@ if(WIN32)
     list(APPEND PCO_INCLUDE_DIRS
         ${PCO_INCLUDE_DIRS}/include
     )
-    find_library(PCO_LIBRARIES NAMES SC2_Cam.lib HINTS ${PCO_SDKWIN_DIR}/lib64)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(PCO_SDK_LIBRARY_DIR "${PCO_SDKWIN_DIR}/lib64")
+    else()
+        set(PCO_SDK_LIBRARY_DIR "${PCO_SDKWIN_DIR}/lib")
+    endif()
+    find_library(PCO_LIBRARIES NAMES SC2_Cam.lib HINTS "${PCO_SDK_LIBRARY_DIR}")
 
 else()
 

@@ -45,7 +45,8 @@ SyncCtrlObj::SyncCtrlObj(Camera *cam, BufferCtrlObj *buffer)
 
       m_cam(cam), m_handle(cam->getHandle()), m_trig_mode(IntTrig),
       m_buffer(buffer), m_nb_frames(1), m_nb_acq_frames(0), m_started(false),
-      m_exposing(pcoAcqIdle), m_pcoData(cam->_getPcoData())
+      m_exposing(pcoAcqIdle), m_pcoData(cam->_getPcoData()),
+      m_requestStop(stopNone), m_requestStopRetry(0)
 {
     DEB_CONSTRUCTOR();
     _setRequestStop(stopNone);
@@ -87,7 +88,8 @@ bool SyncCtrlObj::checkTrigMode(TrigMode trig_mode)
             return true;
 
         case ExtTrigSingle:
-            if ((m_cam->_isCameraType(Dimax)) || m_extTrigSingle_eq_Multi)
+            if (m_cam->_isCameraType(Dimax) ||
+                (m_extTrigSingle_eq_Multi && !m_cam->_isCameraType(Pco2k | Pco4k)))
                 return true;
             break;
 
@@ -147,7 +149,6 @@ void SyncCtrlObj::xlatLimaTrigMode2Pco(lima::TrigMode limaTrigMode,
     WORD _pcoTrigMode = 0;
 
     const char *sPcoAcqMode = "invalid";
-    WORD _pcoAcqMode = 0;
     bool ext_trig;
     err = -1;
 
@@ -156,7 +157,7 @@ void SyncCtrlObj::xlatLimaTrigMode2Pco(lima::TrigMode limaTrigMode,
         throw LIMA_HW_EXC(NotSupported, "Trigger type not supported");
     }
 
-    // · acquire mode to be selected:
+    // ï¿½ acquire mode to be selected:
     // - 0x0000 = [auto] - all images taken are stored
 
     // - 0x0001 = [external] - the external control input <acq enbl> is a static
@@ -194,8 +195,7 @@ void SyncCtrlObj::xlatLimaTrigMode2Pco(lima::TrigMode limaTrigMode,
             break;
 
         case ExtTrigSingle:
-            // trig (at ACQ ENABLE) starts a sequence of int trigger (dimax
-            // only)
+            // Dimax: automatic exposures, recording stopped by ACQ ENABLE.
             //   StorageMode 0 - record mode
             //   RecorderSubmode 1 - ring buffer
             //   Triggermode 0 - auto
@@ -270,7 +270,6 @@ void SyncCtrlObj::xlatLimaTrigMode2Pco(lima::TrigMode limaTrigMode,
 
     err = 0;
     pcoTrigMode = _pcoTrigMode;
-    pcoAcqMode = _pcoAcqMode;
     extTrig = ext_trig;
     DEB_ALWAYS() << "\n ... " << DEB_VAR1(sLimaTriggerMode) << "\n ... "
                  << DEB_VAR3(sPcoTriggerMode, pcoTrigMode, extTrig) << "\n ... "
@@ -474,7 +473,16 @@ void SyncCtrlObj::startAcq()
 
         _setRequestStop(stopNone);
         setExposing(pcoAcqStart);
-        m_cam->startAcq();
+        try
+        {
+            m_cam->startAcq();
+        }
+        catch (...)
+        {
+            setStarted(false);
+            m_cam->cancelRingBufferPreparation();
+            throw;
+        }
         if (getExposing() == pcoAcqError)
         {
             setStarted(false);
@@ -498,7 +506,8 @@ void SyncCtrlObj::startAcq()
                     << DEB_VAR3(val, val0, retry);
         lock.unlock();
 
-        setStarted(true);
+        if (!m_cam->getRingBufferEnabled())
+            setStarted(true);
     }
 }
 
@@ -522,6 +531,7 @@ pcoAcqStatus SyncCtrlObj::getExposing()
 {
     DEB_MEMBER_FUNCT();
     DEF_FNID;
+    AutoMutex lock(m_cond.mutex());
 
     DEB_TRACE() << DEB_VAR1(m_exposing);
     return m_exposing;
@@ -547,6 +557,7 @@ bool SyncCtrlObj::getStarted()
 {
     DEB_MEMBER_FUNCT();
     DEF_FNID;
+    AutoMutex lock(m_cond.mutex());
 
     DEB_TRACE() << DEB_VAR1(m_started);
 
@@ -562,8 +573,10 @@ void SyncCtrlObj::stopAcq(bool clearQueue)
 
     int _stopRequestIn, _stopRequestOut, _nrStop;
     bool _started;
-    bool resWait;
+    bool resWait = false;
 
+    if (m_cam->isRingBufferCompletionThread())
+        return;
     AutoMutex lock(m_cond.mutex());
 
     DEB_ALWAYS() << m_cam->_sprintComment(false, fnId, "[ENTRY]");
@@ -578,6 +591,7 @@ void SyncCtrlObj::stopAcq(bool clearQueue)
     }
     lock.unlock();
     _stopRequestOut = _getRequestStop(_nrStop);
+    m_cam->cancelRingBufferPreparation();
 
     DEB_ALWAYS() << fnId << " [exit]"
                  << ": "
@@ -588,6 +602,18 @@ void SyncCtrlObj::stopAcq(bool clearQueue)
 //=========================================================================================================
 void SyncCtrlObj::getStatus(HwInterface::StatusType &status)
 {
+    if (m_cam->hasRingBufferFault())
+    {
+        status.acq = AcqFault;
+        status.det = DetFault;
+        return;
+    }
+    if (m_cam->isRingBufferBusy())
+    {
+        status.acq = AcqRunning;
+        status.det = DetLatency;
+        return;
+    }
     bool _started = getStarted();
     DEB_MEMBER_FUNCT();
     // DEB_TRACE() << DEB_VAR3(_started, m_buffer, m_exposing);
@@ -646,6 +672,7 @@ void SyncCtrlObj::getStatus(HwInterface::StatusType &status)
 //=========================================================================================================
 int SyncCtrlObj::_getRequestStop(int &nrStop)
 {
+    AutoMutex lock(m_cond.mutex());
     nrStop = m_requestStopRetry;
 
     return m_requestStop;
@@ -654,6 +681,7 @@ int SyncCtrlObj::_getRequestStop(int &nrStop)
 void SyncCtrlObj::_setRequestStop(int requestStop)
 {
     DEB_MEMBER_FUNCT();
+    AutoMutex lock(m_cond.mutex());
 
     int m_requestStop0 = m_requestStop;
 

@@ -43,6 +43,8 @@
 //===============================================================
 // INCLUDES
 //===============================================================
+#include "lima/LimaCompatibility.h"
+
 #ifdef __linux__
 #    include <defs.h>
 #    include <stdint.h>

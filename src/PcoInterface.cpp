@@ -121,11 +121,18 @@ void Interface::prepareAcq()
 
     m_cam->_setActionTimestamp(tsPrepareAcq);
 
-    if (m_buffer)
+    m_cam->prepareRingBuffer();
+    try
     {
-        m_buffer->prepareAcq();
+        if (m_buffer)
+            m_buffer->prepareAcq();
+        m_cam->prepareAcq();
     }
-    m_cam->prepareAcq();
+    catch (...)
+    {
+        m_cam->cancelRingBufferPreparation();
+        throw;
+    }
 }
 
 //=========================================================================================================

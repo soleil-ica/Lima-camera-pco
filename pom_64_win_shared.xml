@@ -46,7 +46,7 @@
 					<cpp>
 						<sourceDirectory>src</sourceDirectory>
 						<includePaths>
-							<includePath>include</includePath>
+							<includePath>${project.basedir}\include</includePath>
 							<includePath>${sdkpco-include-1}</includePath>
 							<includePath>${sdkpco-include-2}</includePath>
 						</includePaths>
